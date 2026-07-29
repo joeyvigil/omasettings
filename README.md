@@ -4,29 +4,7 @@ A terminal UI for adjusting Omarchy settings from one menu — appearance, the
 status bar, keybindings, input, displays, audio, network, notifications,
 startup programs, power, and system configuration.
 
-```
-╭──────────────────────────────────────────────────────────────╮
-│  󰒓  Omarchy Settings                                         │
-╰──────────────────────────────────────────────────────────────╯
-What would you like to change?
-❯ Search all settings…  type to find anything
-  Appearance           theme · font · wallpaper
-  Look & Feel          gaps · borders · animations
-  Waybar               modules · position · height
-  Keybindings          browse · search · rebind
-  Input                keyboard · mouse · touchpad
-  Display              monitors · brightness · night light
-  Audio                devices · volume
-  Network              wi-fi · bluetooth · dns
-  Notifications        do-not-disturb · timeout · position
-  Toggles              waybar · idle · screensaver
-  Apps & Startup       defaults · login programs · web apps
-  Power                profile · idle · battery
-  System               update · security · snapshots
-  Changed from defaults  what you have customized
-  Restore a backup       undo an earlier change
-  Quit
-```
+![omasettings in action](demo/omasettings.gif)
 
 Every menu shows the current value next to each setting, so you can read the
 state of the system without changing anything.
@@ -195,7 +173,27 @@ lib/registry.sh     declarative table of Hyprland-backed settings
 lib/search.sh       global search, changed-from-defaults, backup restore
 lib/*.sh            one file per section
 install.sh          symlink onto PATH
+packaging/          PKGBUILDs and the AUR publishing script
+demo/               VHS tape and recorder for the README GIF
 ```
+
+### Re-recording the demo
+
+```bash
+omarchy pkg add vhs gifsicle
+./demo/record.sh
+```
+
+The recording drives the real application against the real system, so
+`record.sh` notes the one setting the tape changes (corner rounding), restores
+it on exit even if VHS crashes partway, and clears the backups the run
+generates. It also injects the palette of whichever theme is currently active,
+so the GIF matches the desktop it was recorded on.
+
+The tape depends on two things that are easy to break: gum resets each menu's
+cursor to the first row when you return to it, and the arrow-key counts in the
+theme picker are chosen to land on themes that actually ship a `preview.png`.
+Both are commented in `demo/demo.tape`.
 
 omasettings reads the palette from `~/.config/omarchy/current/theme/colors.toml`
 at startup and re-reads it after a theme change, so it restyles itself
