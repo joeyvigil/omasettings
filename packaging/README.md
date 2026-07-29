@@ -32,37 +32,57 @@ cd /tmp/b && makepkg -f --nodeps
 
 ## Publishing to the AUR
 
-1. **Cut a release** so `source=` has something to download:
+One prerequisite, which needs a browser:
 
-   ```bash
-   git tag -a v1.0.0 -m "omasettings 1.0.0"
-   git push origin v1.0.0
-   ```
+1. Register at <https://aur.archlinux.org/register>.
+2. Under **My Account → SSH Public Key**, paste `~/.ssh/id_ed25519.pub`.
 
-2. **Replace `SKIP` with a real checksum.** `SKIP` is fine while iterating but
-   should not ship — it disables integrity checking for everyone installing.
+Then:
 
-   ```bash
-   updpkgsums PKGBUILD     # from pacman-contrib
-   ```
+```bash
+./packaging/publish-aur.sh          # omasettings
+./packaging/publish-aur.sh --git    # omasettings-git
+```
 
-3. **Add an SSH key to your AUR account** at
-   <https://aur.archlinux.org/account/> (Account → SSH Public Key).
+The script checks your AUR SSH access first and tells you exactly what to do if
+it fails, builds the package once to confirm the PKGBUILD works, clones the AUR
+repo, regenerates `.SRCINFO`, shows the diff, and asks before pushing. Re-run it
+for every update — it is idempotent and exits quietly when nothing changed.
 
-4. **Clone the empty AUR repo and push:**
+### If you prefer to do it by hand
 
-   ```bash
-   git clone ssh://aur@aur.archlinux.org/omasettings.git aur-omasettings
-   cd aur-omasettings
-   cp ../packaging/PKGBUILD .
-   makepkg --printsrcinfo > .SRCINFO   # required; the AUR rejects pushes without it
-   git add PKGBUILD .SRCINFO
-   git commit -m "Initial release: omasettings 1.0.0"
-   git push
-   ```
+Three things trip people up:
 
-`.SRCINFO` has to be regenerated and committed on every version bump, or the
-AUR web view will show stale metadata.
+- **Clone as a sibling of this checkout, not inside it.** Cloning the AUR repo
+  into the project directory nests one git repo inside another.
+- **`.SRCINFO` must be in the commit.** The AUR rejects pushes without it, and
+  serves stale metadata if you change the PKGBUILD without regenerating it.
+- **The AUR only accepts the `master` branch.** A fresh clone of an empty repo
+  takes its name from `init.defaultBranch`, which is `main` on many setups.
+
+```bash
+cd ~/Projects                                   # NOT inside the omasettings repo
+git clone ssh://aur@aur.archlinux.org/omasettings.git aur-omasettings
+cd aur-omasettings
+git branch -m master 2>/dev/null || true        # AUR requires master
+cp ../omasettings/packaging/PKGBUILD .
+makepkg --printsrcinfo > .SRCINFO
+git add PKGBUILD .SRCINFO
+git commit -m "omasettings 1.0.0-1"
+git push origin master
+```
+
+### Cutting a new version
+
+```bash
+# bump pkgver in packaging/PKGBUILD, then:
+git tag -a v1.1.0 -m "omasettings 1.1.0" && git push origin v1.1.0
+updpkgsums packaging/PKGBUILD                   # from pacman-contrib
+git commit -am "Release 1.1.0" && git push
+./packaging/publish-aur.sh
+```
+
+Bump `pkgrel` instead of `pkgver` when only the packaging changed.
 
 ## Notes on dependencies
 
