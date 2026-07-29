@@ -14,6 +14,9 @@ while [[ -L $_self ]]; do
 done
 OMA_ROOT="$(cd "$(dirname "$_self")/.." && pwd)"
 OMA_LIB="$OMA_ROOT/lib"
+# fzf preview panes re-invoke this script, so it needs its own absolute path.
+OMA_SELF="$(cd "$(dirname "$_self")" && pwd)/$(basename "$_self")"
+export OMA_SELF
 # Packaged installs symlink /usr/bin/omasettings at the copy under /usr/share,
 # so the resolution above already lands correctly; this is belt and braces for
 # anyone who links the wrapper somewhere else.
@@ -21,6 +24,16 @@ OMA_LIB="$OMA_ROOT/lib"
 
 # shellcheck source=../lib/core.sh
 source "$OMA_LIB/core.sh"
+
+# Internal fast path. fzf re-runs this once per highlighted theme, so it loads
+# only the two files the preview touches instead of the whole program.
+if [[ ${1:-} == __theme-preview ]]; then
+  # shellcheck source=../lib/appearance.sh
+  source "$OMA_LIB/appearance.sh"
+  theme_preview "${2:-}"
+  exit 0
+fi
+
 # shellcheck source=../lib/hyprconf.sh
 source "$OMA_LIB/hyprconf.sh"
 # registry.sh references the config paths hyprconf.sh defines, so it follows it.

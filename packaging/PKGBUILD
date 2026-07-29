@@ -9,6 +9,8 @@ license=('MIT')
 depends=('bash' 'gum' 'jq')
 optdepends=(
   'omarchy: the system this configures — required in practice'
+  'fzf: live theme previews in the theme picker'
+  'chafa: render theme screenshots in the terminal'
   'hyprland: window appearance, input, and monitor settings'
   'waybar: status bar module configuration'
   'mako: notification settings'

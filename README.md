@@ -52,6 +52,27 @@ enough to update. Set `BIN_DIR` to link elsewhere.
 Requires `omarchy`, [`gum`](https://github.com/charmbracelet/gum), and `jq` —
 Omarchy ships all three.
 
+For live theme previews, also install `chafa` (`fzf` is already on Omarchy):
+
+```bash
+omarchy pkg add chafa
+```
+
+## Theme previews
+
+Appearance › Theme shows each theme's shipped `preview.png` beside the list,
+updating as you move through it, along with the full 16-colour palette read
+from the theme's `colors.toml`.
+
+The screenshot needs `chafa`; without it the palette still renders and the pane
+explains what to install. The palette needs nothing at all. Themes that ship no
+`preview.png` say so rather than showing an empty pane.
+
+`chafa` renders to Unicode blocks rather than a graphics protocol on purpose:
+Alacritty — Omarchy's default terminal — supports neither Sixel nor the Kitty
+graphics protocol, and protocol images do not clip to fzf's preview pane even
+where they are supported.
+
 ## Why not just `omarchy menu`?
 
 Omarchy already has a settings UI: `omarchy menu`, driven by Walker. omasettings
