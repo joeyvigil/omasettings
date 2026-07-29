@@ -1,207 +1,67 @@
 # omasettings
 
-A terminal UI for adjusting Omarchy settings from one menu — appearance, the
-status bar, keybindings, input, displays, audio, network, notifications,
-startup programs, power, and system configuration.
+A terminal UI for Omarchy settings — theme, keybindings, displays, audio,
+notifications, and the rest, in one menu.
 
-![omasettings in action](demo/omasettings.gif)
-
-Every menu shows the current value next to each setting, so you can read the
-state of the system without changing anything.
+![omasettings](demo/omasettings.gif)
 
 ## Install
 
-From the AUR:
-
 ```bash
-omarchy pkg aur add omasettings     # or: yay -S omasettings
+omarchy pkg aur add omasettings
 ```
 
-From a clone, for hacking on it:
+Or from source:
 
 ```bash
 git clone https://github.com/joeyvigil/omasettings
 cd omasettings && ./install.sh
 ```
 
-`install.sh` symlinks `bin/omasettings` into `~/.local/bin`, so a `git pull` is
-enough to update. Set `BIN_DIR` to link elsewhere.
-
-Requires `omarchy`, [`gum`](https://github.com/charmbracelet/gum), `jq`, `fzf`,
-and `chafa`. The AUR package pulls them in; Omarchy already ships all but
-`chafa`, which is a 296 KiB package from `extra` whose own dependencies are
-part of the stock desktop.
-
-Installing from a clone does not resolve dependencies, so grab the one that is
-probably missing:
-
-```bash
-omarchy pkg add chafa
-```
-
-## Theme previews
-
-Appearance › Theme shows each theme's shipped `preview.png` beside the list,
-updating as you move through it, along with the full 16-colour palette read
-from the theme's `colors.toml`.
-
-The screenshot needs `chafa` and the picker needs `fzf`. Both are hard
-dependencies of the package, so this works out of the box — but omasettings
-still degrades cleanly when installed from a clone without them: the palette
-renders on its own, the pane names what to install, and the picker falls back
-to the plain list. Themes that ship no `preview.png` say so rather than showing
-an empty pane.
-
-`chafa` renders to Unicode blocks rather than a graphics protocol on purpose:
-Alacritty — Omarchy's default terminal — supports neither Sixel nor the Kitty
-graphics protocol, and protocol images do not clip to fzf's preview pane even
-where they are supported.
-
-## Why not just `omarchy menu`?
-
-Omarchy already has a settings UI: `omarchy menu`, driven by Walker. omasettings
-is the terminal counterpart. It works over SSH and in a TTY, shows the current
-value of every setting next to it rather than only on the screen you drill into,
-searches across everything at once, and reaches settings that only exist as
-lines in a config file — gaps, opacity, keyboard repeat, touchpad tuning,
-Waybar modules, monitor layout.
-
 ## Usage
 
 ```bash
 omasettings              # open the menu
 omasettings appearance   # jump straight to a section
-omasettings search       # go straight to search
-omasettings --help
+omasettings search       # search every setting at once
 ```
 
-Arrow keys move, `enter` selects, `esc` goes back one level.
+Arrows move, `enter` selects, `esc` goes back.
 
-Sections: `appearance`, `looknfeel`, `waybar`, `keybindings`, `input`,
-`display`, `monitors`, `audio`, `network`, `notifications`, `toggles`, `apps`,
-`power`, `security`, `system`, plus `search`, `changed`, and `restore`.
+## What it covers
 
-## What it changes
-
-| Section | Settings |
+| Section | |
 |---|---|
-| Appearance | Theme, monospace font, wallpaper, corner rounding, window dimming, active/inactive opacity, blur, shadows |
-| Look & Feel | Window gaps mode, inner/outer gaps, border size, resize on border, tiling layout, animations, aspect ratio, scrolling column width |
-| Waybar | Bar visibility, which modules appear and where, bar position, height, module spacing, `style.css` |
-| Keybindings | Browse and search every active binding, rebind, add, remove, list combos running more than one action |
-| Input | Keyboard layout/variant/options, repeat rate and delay, numlock, mouse sensitivity and acceleration, focus-follows-mouse, full touchpad submenu |
-| Display | Per-monitor resolution, refresh, scale, position, rotation, enable/disable; brightness; night light schedule; lock screen |
-| Audio | Default output and input device, volume, mic volume, mute, mixer |
-| Network | Wi-Fi and Bluetooth status and controls, Wi-Fi power saving, DNS provider |
-| Notifications | Do-not-disturb, dismiss timeout, screen corner, width, height, max visible, border, history |
-| Toggles | Waybar, idle lock, night light, screensaver, suspend, do-not-disturb, touchpad, touchscreen, hybrid GPU |
-| Apps & Startup | Default browser/editor/terminal, login startup programs, web apps, terminal-app launchers, optional software |
-| Power | Power profile, idle timeouts, battery status, hibernation |
-| System | Update, timezone, release channel, security (sudo, fingerprint, FIDO2), snapshots, restart components, reset configs, setup wizards, boot screen, debug info |
+| **Appearance** | theme, font, wallpaper, rounding, opacity, blur |
+| **Look & Feel** | gaps, borders, tiling layout, animations |
+| **Waybar** | modules, position, height |
+| **Keybindings** | browse, search, rebind |
+| **Input** | keyboard, mouse, touchpad |
+| **Display** | monitors, brightness, night light |
+| **Audio** | devices, volume |
+| **Network** | Wi-Fi, Bluetooth, DNS |
+| **Notifications** | do-not-disturb, timeout, position |
+| **Apps & Startup** | default apps, login programs, web apps |
+| **Power** | profile, idle, battery, hibernation |
+| **System** | updates, security, snapshots, config resets |
+
+Every menu shows each setting's current value beside it. There is also a global
+search, a view of everything you have changed from Omarchy's defaults, and a
+restore picker for any backup omasettings has taken.
 
 ## How it works
 
-Two kinds of setting sit behind one interface:
+Settings Omarchy already has a command for are delegated to `omarchy ...`, so
+hooks still fire. The rest are edited directly in `~/.config`, with a writer per
+format that preserves comments and layout. Nothing under
+`~/.local/share/omarchy/` is ever written to.
 
-- **Things Omarchy already has a command for** (themes, fonts, toggles, default
-  apps, snapshots) are delegated to `omarchy ...` so behaviour matches the rest
-  of the system, hooks included.
-- **Things that only live in config files** (gaps, opacity, keyboard repeat,
-  Waybar modules, mako timeouts, monitor layout) are edited directly under
-  `~/.config/`.
+Files are backed up before every edit. Hyprland changes are reloaded and checked
+with `hyprctl configerrors`, and offered back from the backup if they fail.
 
-Nothing under `~/.local/share/omarchy/` is ever written to — that is Omarchy's
-own git checkout, and edits there are lost on the next update.
+## Development
 
-The System menu's restart / refresh / install / setup submenus are generated
-from `omarchy commands --json`, so commands added by future Omarchy releases
-appear automatically.
+`packaging/` holds the PKGBUILDs and the AUR publishing script. `demo/` holds
+the VHS tape and recorder for the GIF above.
 
-### The settings registry
-
-`lib/registry.sh` declares every Hyprland-backed setting in one table — section,
-label, file, config section, key, live option, type, choices. Section menus,
-global search, and the changed-from-defaults view all read from it, so adding a
-line there makes a setting appear in all three at once.
-
-### Editing config files safely
-
-Each format gets a writer that understands it, so comments and layout survive:
-
-- **Hyprland** (`*.conf`) — brace-scoped. Uncomments a setting in place when
-  Omarchy left it commented as a hint, creates nested blocks like
-  `decoration { blur { … } }`, and drops duplicate assignments that would
-  silently win on reload.
-- **monitors.conf** — a flat list of `monitor =` lines; the named override for
-  one output is replaced in place, leaving Omarchy's wildcard line alone.
-- **Waybar** (`config.jsonc`) — patches a single top-level key, whether its
-  value is inline or spread over several lines. Depth is tracked with string
-  literals blanked out first, because Waybar format strings (`"{icon}"`) would
-  otherwise throw off the brace count.
-- **mako** — only the global region above the first `[criteria]` block is
-  touched; criteria blocks are left alone.
-- **autostart.conf** — startup programs are disabled by commenting, not
-  deleting, so it is reversible from the same list.
-
-Choosing **Use Omarchy default** (or submitting an empty value) comments the
-line back out rather than deleting it.
-
-Every file is backed up to `<file>.bak.<timestamp>` before each edit. After a
-Hyprland change the config is reloaded and checked with `hyprctl configerrors`;
-if it fails, the errors are shown and you are offered the backup back.
-**Restore a backup** on the main menu lists every backup under `~/.config`
-newest first, shows a diff, and restores the one you pick — itself backing up
-what it replaces.
-
-### When a setting appears to do nothing
-
-Hyprland sources `~/.local/state/omarchy/toggles/hypr/*.conf` *after* your own
-config, so an active Omarchy toggle overrides it. The most common case is
-no-gaps mode, which pins gaps, border size, and rounding to `0`.
-
-When a value is written but Hyprland keeps reporting a different one,
-omasettings says so and names the file responsible instead of leaving you to
-wonder. Look & Feel › Window gaps mode turns that particular one off.
-
-## Layout
-
-```
-bin/omasettings     entry point, argument handling, main menu
-lib/core.sh         theming, prompts, output helpers
-lib/hyprconf.sh     Hyprland config read/write, reload, verification
-lib/registry.sh     declarative table of Hyprland-backed settings
-lib/search.sh       global search, changed-from-defaults, backup restore
-lib/*.sh            one file per section
-install.sh          symlink onto PATH
-packaging/          PKGBUILDs and the AUR publishing script
-demo/               VHS tape and recorder for the README GIF
-```
-
-### Re-recording the demo
-
-```bash
-omarchy pkg add vhs gifsicle
-./demo/record.sh
-```
-
-The recording drives the real application against the real system, so
-`record.sh` notes the one setting the tape changes (corner rounding), restores
-it on exit even if VHS crashes partway, and clears the backups the run
-generates. It also injects the palette of whichever theme is currently active,
-so the GIF matches the desktop it was recorded on.
-
-The tape depends on two things that are easy to break: gum resets each menu's
-cursor to the first row when you return to it, and the arrow-key counts in the
-theme picker are chosen to land on themes that actually ship a `preview.png`.
-Both are commented in `demo/demo.tape`.
-
-omasettings reads the palette from `~/.config/omarchy/current/theme/colors.toml`
-at startup and re-reads it after a theme change, so it restyles itself
-immediately rather than waiting for a new session.
-
-### Notes on the environment
-
-- `hyprctl -j binds` emits malformed JSON in current Hyprland (keys and values
-  come out misaligned), so keybindings are parsed from the plain-text output.
-- Labels are padded by character count rather than `printf`'s byte-based
-  `%-Ns`, which would misalign any row containing `›`, `…`, or `←`.
+MIT
