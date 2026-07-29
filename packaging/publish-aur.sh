@@ -13,10 +13,12 @@ set -euo pipefail
 
 VARIANT=release
 BUILD_CHECK=1
+ASSUME_YES=0
 for arg in "$@"; do
   case "$arg" in
   --git) VARIANT=git ;;
   --no-build) BUILD_CHECK=0 ;;
+  --yes | -y) ASSUME_YES=1 ;;
   -h | --help)
     sed -n '2,12p' "$0" | sed 's/^# \?//'
     exit 0
@@ -130,7 +132,20 @@ This pushes to the AUR, where it becomes publicly installable straight away.
 Removing a package afterwards requires asking a Package Maintainer.
 
 EOF
-read -rp "Push to the AUR? [y/N] " reply
+if ((ASSUME_YES)); then
+  reply=y
+elif [[ ! -t 0 ]]; then
+  # bash only prints a read prompt on a terminal, and git clone's ssh will have
+  # eaten anything piped in, so refuse rather than appear to hang or abort
+  # for no visible reason.
+  echo "Not running interactively. Re-run with --yes to publish." >&2
+  exit 1
+else
+  # read returns non-zero at EOF; without the guard, set -e would kill the
+  # script here with no explanation.
+  read -rp "Push to the AUR? [y/N] " reply || reply=""
+fi
+
 [[ $reply == [yY] ]] || {
   echo "Aborted. Nothing was pushed; the staged files are still in $AUR_DIR"
   exit 0
