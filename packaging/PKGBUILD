@@ -17,7 +17,7 @@ optdepends=(
   'iw: Wi-Fi power saving'
 )
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('58ec6a17c7f65037424ce3d0f85fedc7c0f09b8295f27a4fd4c6d01b79ae9e7d')
+sha256sums=('943074d1c7ea7bdb119cc686c98023b3b9f9bc78a9091223ae898f0b13d66140')
 
 check() {
   cd "$srcdir/$pkgname-$pkgver"
