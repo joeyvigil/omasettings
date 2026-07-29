@@ -17,6 +17,9 @@ Or from source:
 git clone https://github.com/joeyvigil/omasettings
 cd omasettings && ./install.sh
 ```
+Or from install menu (Super + Alt + Space -> Install -> AUR):
+
+![omasettings](demo/aur-install.png)
 
 ## Usage
 
