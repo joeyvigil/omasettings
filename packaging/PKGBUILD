@@ -1,6 +1,6 @@
 # Maintainer: Joseph Vigil <joeyvigil109329@gmail.com>
 pkgname=omasettings
-pkgver=1.0.0
+pkgver=1.1.0
 pkgrel=1
 pkgdesc="Terminal UI for adjusting Omarchy settings: theme, keybindings, displays, audio, and more"
 arch=('any')
