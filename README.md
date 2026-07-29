@@ -19,7 +19,7 @@ cd omasettings && ./install.sh
 ```
 Or from install menu (Super + Alt + Space -> Install -> AUR):
 
-![omasettings](demo/aur-install.png)
+![omasettings in the Omarchy install menu's AUR listing](demo/aur-install.png)
 
 ## Usage
 
