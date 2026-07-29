@@ -49,10 +49,13 @@ cd omasettings && ./install.sh
 `install.sh` symlinks `bin/omasettings` into `~/.local/bin`, so a `git pull` is
 enough to update. Set `BIN_DIR` to link elsewhere.
 
-Requires `omarchy`, [`gum`](https://github.com/charmbracelet/gum), and `jq` —
-Omarchy ships all three.
+Requires `omarchy`, [`gum`](https://github.com/charmbracelet/gum), `jq`, `fzf`,
+and `chafa`. The AUR package pulls them in; Omarchy already ships all but
+`chafa`, which is a 296 KiB package from `extra` whose own dependencies are
+part of the stock desktop.
 
-For live theme previews, also install `chafa` (`fzf` is already on Omarchy):
+Installing from a clone does not resolve dependencies, so grab the one that is
+probably missing:
 
 ```bash
 omarchy pkg add chafa
@@ -64,9 +67,12 @@ Appearance › Theme shows each theme's shipped `preview.png` beside the list,
 updating as you move through it, along with the full 16-colour palette read
 from the theme's `colors.toml`.
 
-The screenshot needs `chafa`; without it the palette still renders and the pane
-explains what to install. The palette needs nothing at all. Themes that ship no
-`preview.png` say so rather than showing an empty pane.
+The screenshot needs `chafa` and the picker needs `fzf`. Both are hard
+dependencies of the package, so this works out of the box — but omasettings
+still degrades cleanly when installed from a clone without them: the palette
+renders on its own, the pane names what to install, and the picker falls back
+to the plain list. Themes that ship no `preview.png` say so rather than showing
+an empty pane.
 
 `chafa` renders to Unicode blocks rather than a graphics protocol on purpose:
 Alacritty — Omarchy's default terminal — supports neither Sixel nor the Kitty
