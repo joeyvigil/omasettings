@@ -1,0 +1,9 @@
+# Backups omasettings writes next to configs it edits
+*.bak.*
+
+# makepkg build output
+packaging/src/
+packaging/pkg/
+packaging/*.tar.gz
+packaging/*.pkg.tar.zst
+packaging/*.log

@@ -1,0 +1,167 @@
+#!/bin/bash
+# omasettings — a terminal UI for Omarchy settings.
+
+set -uo pipefail
+
+OMA_VERSION="1.0.0"
+
+# Resolve through symlinks so ~/.local/bin/omasettings can point at a checkout
+# and keep working when the checkout moves.
+_self="${BASH_SOURCE[0]}"
+while [[ -L $_self ]]; do
+  _target=$(readlink "$_self")
+  [[ $_target == /* ]] && _self="$_target" || _self="$(dirname "$_self")/$_target"
+done
+OMA_ROOT="$(cd "$(dirname "$_self")/.." && pwd)"
+OMA_LIB="$OMA_ROOT/lib"
+# Packaged installs symlink /usr/bin/omasettings at the copy under /usr/share,
+# so the resolution above already lands correctly; this is belt and braces for
+# anyone who links the wrapper somewhere else.
+[[ -d $OMA_LIB ]] || OMA_LIB="/usr/share/omasettings/lib"
+
+# shellcheck source=../lib/core.sh
+source "$OMA_LIB/core.sh"
+# shellcheck source=../lib/hyprconf.sh
+source "$OMA_LIB/hyprconf.sh"
+# registry.sh references the config paths hyprconf.sh defines, so it follows it.
+# shellcheck source=../lib/registry.sh
+source "$OMA_LIB/registry.sh"
+for _m in appearance looknfeel waybar keybindings input monitors display audio \
+  network notifications toggles defaults apps power security system search; do
+  # shellcheck source=/dev/null
+  source "$OMA_LIB/$_m.sh"
+done
+
+usage() {
+  cat <<EOF
+omasettings $OMA_VERSION — adjust Omarchy settings from the terminal
+
+Usage:
+  omasettings                 Open the settings menu
+  omasettings <section>       Jump straight to a section
+  omasettings -h | --help     Show this help
+  omasettings -v | --version  Show the version
+
+Sections:
+  appearance     Theme, font, wallpaper, rounding, opacity, blur
+  looknfeel      Gaps, borders, tiling layout, animations
+  waybar         Status bar modules, position, height
+  keybindings    Browse, search, rebind keyboard shortcuts
+  input          Keyboard, mouse, touchpad
+  display        Monitors, brightness, night light, lock screen
+  monitors       Jump straight to monitor configuration
+  audio          Output/input devices, volume
+  network        Wi-Fi, Bluetooth, DNS
+  notifications  Do-not-disturb, timeout, position
+  toggles        Waybar, idle lock, night light, screensaver, touch input
+  apps           Default apps, startup programs, web apps, launchers
+  power          Power profile, idle behaviour, battery, hibernation
+  security       Sudo, fingerprint, FIDO2, snapshots
+  system         Updates, timezone, release channel, refresh/restart, boot screen
+
+Anything changed here is written to your own ~/.config files. Files are backed
+up before each edit, and Hyprland changes are validated with hyprctl.
+EOF
+}
+
+main_menu() {
+  while true; do
+    oma_screen ""
+
+    local choice
+    choice=$(oma_select "What would you like to change?" \
+      "$(printf 'search\tSearch all settings…\ttype to find anything')" \
+      "$(printf 'appearance\tAppearance\ttheme · font · wallpaper')" \
+      "$(printf 'looknfeel\tLook & Feel\tgaps · borders · animations')" \
+      "$(printf 'waybar\tWaybar\tmodules · position · height')" \
+      "$(printf 'keybindings\tKeybindings\tbrowse · search · rebind')" \
+      "$(printf 'input\tInput\tkeyboard · mouse · touchpad')" \
+      "$(printf 'display\tDisplay\tmonitors · brightness · night light')" \
+      "$(printf 'audio\tAudio\tdevices · volume')" \
+      "$(printf 'network\tNetwork\twi-fi · bluetooth · dns')" \
+      "$(printf 'notifications\tNotifications\tdo-not-disturb · timeout · position')" \
+      "$(printf 'toggles\tToggles\twaybar · idle · screensaver')" \
+      "$(printf 'apps\tApps & Startup\tdefaults · login programs · web apps')" \
+      "$(printf 'power\tPower\tprofile · idle · battery')" \
+      "$(printf 'system\tSystem\tupdate · security · snapshots')" \
+      "$(printf 'changed\tChanged from defaults\twhat you have customized')" \
+      "$(printf 'restore\tRestore a backup\tundo an earlier change')" \
+      "$OMA_QUIT") || return 0
+
+    case "$choice" in
+    search) oma_search ;;
+    changed) oma_changed ;;
+    restore) oma_restore ;;
+    appearance) appearance_menu ;;
+    looknfeel) looknfeel_menu ;;
+    waybar) waybar_menu ;;
+    keybindings) keybindings_menu ;;
+    input) input_menu ;;
+    display) display_menu ;;
+    audio) audio_menu ;;
+    network) network_menu ;;
+    notifications) notifications_menu ;;
+    toggles) toggles_menu ;;
+    apps) apps_menu ;;
+    power) power_menu ;;
+    system) system_menu ;;
+    quit | *) return 0 ;;
+    esac
+  done
+}
+
+main() {
+  case "${1:-}" in
+  -h | --help | help)
+    usage
+    exit 0
+    ;;
+  -v | --version)
+    printf 'omasettings %s\n' "$OMA_VERSION"
+    exit 0
+    ;;
+  esac
+
+  oma_require gum jq || exit 1
+  command -v omarchy >/dev/null 2>&1 || {
+    printf 'omasettings: the `omarchy` command was not found on PATH.\n' >&2
+    printf 'This tool configures an Omarchy system and needs it installed.\n' >&2
+    exit 1
+  }
+
+  oma_load_theme
+
+  case "${1:-}" in
+  "") main_menu ;;
+  appearance | theme | font) appearance_menu ;;
+  looknfeel | look) looknfeel_menu ;;
+  waybar | bar) waybar_menu ;;
+  keybindings | keys | bindings) keybindings_menu ;;
+  input | keyboard | touchpad) input_menu ;;
+  display) display_menu ;;
+  monitors) monitors_menu ;;
+  audio | sound) audio_menu ;;
+  network | wifi | bluetooth) network_menu ;;
+  notifications | mako) notifications_menu ;;
+  toggles | toggle) toggles_menu ;;
+  apps | startup | defaults | default) apps_menu ;;
+  power | battery) power_menu ;;
+  security) security_menu ;;
+  system | update) system_menu ;;
+  search | find) oma_search ;;
+  changed | diff) oma_changed ;;
+  restore | undo) oma_restore ;;
+  *)
+    printf 'omasettings: unknown section "%s"\n\n' "$1" >&2
+    usage >&2
+    exit 1
+    ;;
+  esac
+
+  clear
+}
+
+# Leave the terminal usable if the user quits mid-prompt.
+trap 'printf "\n"; exit 0' INT
+
+main "$@"

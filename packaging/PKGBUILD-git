@@ -1,0 +1,53 @@
+# Maintainer: Joseph Vigil <joeyvigil109329@gmail.com>
+#
+# Tracks the main branch. Publish this as `omasettings-git` on the AUR if you
+# want people on the latest commit; it needs no tagged release to work.
+pkgname=omasettings-git
+_pkgname=omasettings
+pkgver=r1.0000000
+pkgrel=1
+pkgdesc="Terminal UI for adjusting Omarchy settings (git version)"
+arch=('any')
+url="https://github.com/joeyvigil/omasettings"
+license=('MIT')
+depends=('bash' 'gum' 'jq')
+makedepends=('git')
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+optdepends=(
+  'omarchy: the system this configures — required in practice'
+  'hyprland: window appearance, input, and monitor settings'
+  'waybar: status bar module configuration'
+  'mako: notification settings'
+  'libpulse: audio device selection'
+  'wireplumber: volume control'
+  'iw: Wi-Fi power saving'
+)
+source=("$_pkgname::git+$url.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$srcdir/$_pkgname"
+  printf 'r%s.%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+check() {
+  cd "$srcdir/$_pkgname"
+  local f
+  for f in bin/omasettings lib/*.sh install.sh; do
+    bash -n "$f"
+  done
+}
+
+package() {
+  cd "$srcdir/$_pkgname"
+
+  install -Dm755 bin/omasettings "$pkgdir/usr/share/$_pkgname/bin/omasettings"
+  install -Dm644 -t "$pkgdir/usr/share/$_pkgname/lib" lib/*.sh
+
+  install -dm755 "$pkgdir/usr/bin"
+  ln -s "/usr/share/$_pkgname/bin/omasettings" "$pkgdir/usr/bin/omasettings"
+
+  install -Dm644 -t "$pkgdir/usr/share/doc/$_pkgname" README.md
+  install -Dm644 -t "$pkgdir/usr/share/licenses/$_pkgname" LICENSE
+}
