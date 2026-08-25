@@ -18,7 +18,7 @@ optdepends=(
   'mako: notification settings on Omarchy 3'
 )
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('645ec4798a21059f015dbb89b7e723dce87b6cbe479ee033aa7e1374549fe368')
 
 check() {
   cd "$srcdir/$pkgname-$pkgver"
