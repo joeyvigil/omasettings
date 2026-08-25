@@ -17,11 +17,12 @@ conflicts=("$_pkgname")
 optdepends=(
   'omarchy: the system this configures — required in practice'
   'hyprland: window appearance, input, and monitor settings'
-  'waybar: status bar module configuration'
-  'mako: notification settings'
   'libpulse: audio device selection'
   'wireplumber: volume control'
-  'iw: Wi-Fi power saving'
+  'iw: Wi-Fi power saving status'
+  'networkmanager: Wi-Fi power saving on Omarchy 4'
+  'waybar: status bar configuration on Omarchy 3'
+  'mako: notification settings on Omarchy 3'
 )
 source=("$_pkgname::git+$url.git")
 sha256sums=('SKIP')

@@ -1,16 +1,18 @@
 #!/bin/bash
-# Read/write settings inside Hyprland's brace-scoped config files.
+# Read/write settings inside Hyprland's brace-scoped .conf files (Omarchy 3),
+# plus the shared machinery both config generations use: live-value lookup,
+# reload-and-verify, and the generic setting editor.
 #
 # Omarchy sources ~/.config/hypr/*.conf after its own defaults, so anything
 # written here overrides the stock value. Sections are addressed with dots
 # ("input.touchpad"); an omitted key is created inside its section, and a
 # commented-out key is uncommented in place so the file's own hints stay put.
+#
+# Omarchy 4's Lua equivalent lives in hyprlua.sh; hypr_get/set/unset below pick
+# between them on the file extension.
 
-OMA_LOOKNFEEL="$OMA_HYPR_DIR/looknfeel.conf"
-OMA_INPUT_CONF="$OMA_HYPR_DIR/input.conf"
-OMA_MONITORS="$OMA_HYPR_DIR/monitors.conf"
-OMA_SUNSET="$OMA_HYPR_DIR/hyprsunset.conf"
-OMA_HYPRIDLE="$OMA_HYPR_DIR/hypridle.conf"
+# The config paths themselves live in compat.sh, which resolves the .conf/.lua
+# split between Omarchy 3 and 4 before this file is sourced.
 
 _hypr_walk='
   function rep(s, n,   i, o) { o = ""; for (i = 0; i < n; i++) o = o s; return o }
@@ -26,9 +28,9 @@ _hypr_walk='
   function is_close(l) { return l ~ /^[[:space:]]*\}/ }
 '
 
-# hypr_get <file> <section> <key> — the effective configured value, or empty
-# when the key is absent or commented out (i.e. Omarchy's default applies).
-hypr_get() {
+# hypr_conf_get <file> <section> <key> — the effective configured value, or
+# empty when the key is absent or commented out (Omarchy's default applies).
+hypr_conf_get() {
   local file="$1" section="$2" key="$3"
   [[ -f $file ]] || return 0
   awk -v target="$section" -v key="$key" "$_hypr_walk"'
@@ -52,8 +54,8 @@ hypr_get() {
   ' "$file"
 }
 
-# hypr_set <file> <section> <key> <value>
-hypr_set() {
+# hypr_conf_set <file> <section> <key> <value>
+hypr_conf_set() {
   local file="$1" section="$2" key="$3" value="$4"
   mkdir -p "$(dirname "$file")"
   [[ -f $file ]] || : >"$file"
@@ -111,9 +113,9 @@ hypr_set() {
   }
 }
 
-# hypr_unset <file> <section> <key> — comment the key out so Omarchy's default
-# takes over again, keeping the previous value visible as a hint.
-hypr_unset() {
+# hypr_conf_unset <file> <section> <key> — comment the key out so Omarchy's
+# default takes over again, keeping the previous value visible as a hint.
+hypr_conf_unset() {
   local file="$1" section="$2" key="$3"
   [[ -f $file ]] || return 0
 
@@ -148,9 +150,18 @@ hypr_unset() {
 hypr_live() {
   oma_hypr_live || return 0
   local v
+  # Hyprland reports each option under a field named for its type. Booleans
+  # come first because older builds folded them into "int", and a `false` read
+  # as an int would otherwise look like no value at all. "css" holds per-side
+  # values ("5 5 5 5") and "vec2" a pair, both of which the caller sees as a
+  # space-separated string.
   v=$(hyprctl -j getoption "$1" 2>/dev/null |
-    jq -r 'if has("int") then .int elif has("float") then .float
-           elif has("str") then .str elif has("custom") then .custom
+    jq -r 'if has("bool") then .bool elif has("int") then .int
+           elif has("float") then .float elif has("str") then .str
+           elif has("css") then (.css | split(" ")
+                                 | if (unique | length) == 1 then .[0] else join(" ") end)
+           elif has("vec2") then (.vec2 | map(tostring) | join(" "))
+           elif has("custom") then .custom
            else empty end | tostring' 2>/dev/null)
 
   # Hyprland reports unset strings with this sentinel; treat it as no value.
@@ -160,15 +171,6 @@ hypr_live() {
   if [[ $v =~ ^-?[0-9]+\.[0-9]+$ ]]; then
     v="${v%"${v##*[!0]}"}"
     v="${v%.}"
-  fi
-
-  # Per-side options come back as "0 0 0 0"; collapse when every side matches.
-  if [[ $v =~ ^([^[:space:]]+)([[:space:]]+[^[:space:]]+)+$ ]]; then
-    local -a parts=() p
-    read -ra parts <<<"$v"
-    local same=1
-    for p in "${parts[@]}"; do [[ $p == "${parts[0]}" ]] || same=0; done
-    ((same)) && v="${parts[0]}"
   fi
 
   printf '%s' "$v"
@@ -214,6 +216,28 @@ hypr_apply() {
     oma_ok "reverted"
   fi
   return 1
+}
+
+# --- format dispatch ---------------------------------------------------------
+#
+# Omarchy 3 configures Hyprland in .conf files, Omarchy 4 in .lua. Both use the
+# same dotted section addressing and the same key names, so the registry and
+# every menu call these three functions and stay unaware of which they are on.
+
+_hypr_is_lua() { [[ $1 == *.lua ]]; }
+
+hypr_get() {
+  if _hypr_is_lua "$1"; then hypr_lua_get "$@"; else hypr_conf_get "$@"; fi
+}
+
+# hypr_set <file> <section> <key> <value> [kind] — `kind` only matters for Lua,
+# where it decides whether the value is quoted.
+hypr_set() {
+  if _hypr_is_lua "$1"; then hypr_lua_set "$@"; else hypr_conf_set "$1" "$2" "$3" "$4"; fi
+}
+
+hypr_unset() {
+  if _hypr_is_lua "$1"; then hypr_lua_unset "$@"; else hypr_conf_unset "$@"; fi
 }
 
 # --- the generic setting editor ----------------------------------------------
@@ -272,7 +296,7 @@ hypr_edit() {
     oma_ok "$label reset to the Omarchy default"
     hypr_apply "$file"
   else
-    hypr_set "$file" "$section" "$key" "$value" || return 1
+    hypr_set "$file" "$section" "$key" "$value" "$kind" || return 1
     oma_ok "$label = $value"
     hypr_apply "$file" && hypr_verify "$live" "$value" "$kind"
   fi
@@ -292,8 +316,10 @@ hypr_verify() {
 
   oma_warn "Hyprland is still using $live"
 
+  # Omarchy 3 writes these snippets as .conf and 4 as .lua, and Lua spells
+  # hyphenated options with underscores, so match either.
   local key="${live_opt##*:}" culprit
-  culprit=$(grep -rlsE "^[[:space:]]*$key[[:space:]]*=" \
+  culprit=$(grep -rlsE "^[[:space:]]*(${key}|${key//-/_})[[:space:]]*=" \
     "$OMA_STATE_DIR/toggles/hypr" 2>/dev/null | head -1)
 
   if [[ -n $culprit ]]; then

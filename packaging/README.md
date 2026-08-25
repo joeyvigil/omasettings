@@ -74,11 +74,14 @@ git push origin master
 
 ### Cutting a new version
 
+Tag first: `updpkgsums` downloads the release tarball, so the tag has to exist
+before the checksum can be filled in.
+
 ```bash
 # bump pkgver in packaging/PKGBUILD, then:
-git tag -a v1.1.0 -m "omasettings 1.1.0" && git push origin v1.1.0
+git tag -a v2.0.0 -m "omasettings 2.0.0" && git push origin v2.0.0
 updpkgsums packaging/PKGBUILD                   # from pacman-contrib
-git commit -am "Release 1.1.0" && git push
+git commit -am "Release 2.0.0" && git push
 ./packaging/publish-aur.sh
 ```
 
@@ -87,8 +90,11 @@ Bump `pkgrel` instead of `pkgver` when only the packaging changed.
 ## Notes on dependencies
 
 `omarchy` is listed under `optdepends` rather than `depends`. The tool is not
-useful without it, but Omarchy is normally installed by its own bootstrap
-script into `~/.local/share/omarchy` rather than as a pacman package, so a hard
-dependency would fail for most of the people who actually want this. The
-wrapper checks for `omarchy` on `PATH` at startup and exits with an explanation
-if it is missing.
+useful without it, but Omarchy 3 is installed by its own bootstrap script into
+`~/.local/share/omarchy` rather than as a pacman package, so a hard dependency
+would fail for those users. (Omarchy 4 does ship as a package under
+`/usr/share/omarchy`.) The wrapper checks for `omarchy` on `PATH` at startup and
+exits with an explanation if it is missing.
+
+`waybar` and `mako` are only used on Omarchy 3; Omarchy 4 replaced both with the
+Quickshell-based Omarchy shell, which comes with Omarchy itself.

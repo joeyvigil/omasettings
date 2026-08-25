@@ -1,12 +1,16 @@
 #!/bin/bash
-# Keybindings: browse, search, rebind, add, and remove.
+# Keybindings on Omarchy 3: browse, search, rebind, add, and remove.
+#
+# Omarchy 4 declares bindings in Lua, where this file's approach does not
+# apply at all; keybindings4.sh handles that generation, and keybindings_menu
+# at the bottom picks between them.
 #
 # Bindings are read from `hyprctl binds` rather than the config files, so what
 # you see is what Hyprland is actually running — Omarchy defaults included.
 # Note that `hyprctl -j binds` emits malformed JSON in current Hyprland (keys
 # and values come out misaligned), hence the plain-text parser below.
 
-OMA_BINDINGS="$OMA_HYPR_DIR/bindings.conf"
+# OMA_BINDINGS is resolved by compat.sh (bindings.conf on 3, bindings.lua on 4).
 
 # Hyprland modmask bits.
 _kb_mods() {
@@ -275,7 +279,7 @@ _kb_conflicts() {
   oma_pause
 }
 
-keybindings_menu() {
+_keybindings_v3_menu() {
   while true; do
     oma_screen "Keybindings"
 
@@ -303,4 +307,8 @@ keybindings_menu() {
     back | *) return 0 ;;
     esac
   done
+}
+
+keybindings_menu() {
+  if oma_v4; then _keybindings_v4_menu; else _keybindings_v3_menu; fi
 }

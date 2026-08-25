@@ -85,7 +85,10 @@ system_menu() {
     oma_screen "System"
 
     local version tz
-    version=$(cat "$HOME/.local/share/omarchy/version" 2>/dev/null)
+    # Omarchy 4 reports the packaged version through the CLI; Omarchy 3 only
+    # had the file.
+    version=$(omarchy version 2>/dev/null)
+    [[ -z $version ]] && version=$(cat "$OMARCHY_PATH/version" 2>/dev/null)
     tz=$(timedatectl show -p Timezone --value 2>/dev/null)
 
     local choice
@@ -109,7 +112,8 @@ system_menu() {
       oma_confirm "Update Omarchy and all system packages?" &&
         oma_exec "System updated" omarchy update
       ;;
-    tz) oma_exec "Timezone updated" omarchy tz select ;;
+    # shellcheck disable=SC2046  # the mapped command is split on purpose
+    tz) oma_exec "Timezone updated" $(oma_cmd_line timezone) ;;
     channel)
       oma_screen "System › Channel"
       oma_warn "The channel decides which Omarchy branch and repos you track."
@@ -141,7 +145,25 @@ system_menu() {
     plymouth) _system_plymouth ;;
     debug)
       oma_screen "System › Debug"
-      omarchy debug --no-sudo --print 2>&1 | gum pager || true
+      # Omarchy 4 dropped `omarchy debug`; assemble the same picture from the
+      # commands that replaced it.
+      if oma_v4; then
+        {
+          printf 'Omarchy %s  (channel: %s)\n\n' \
+            "$(omarchy version 2>/dev/null)" "$(omarchy channel current 2>/dev/null)"
+          printf 'Hyprland:  %s\n' "$(hyprctl version 2>/dev/null | head -1)"
+          printf 'Shell:     %s\n' \
+            "$(pgrep -x quickshell >/dev/null 2>&1 && echo running || echo stopped)"
+          printf 'Theme:     %s\n' "$(omarchy theme current 2>/dev/null)"
+          printf 'Font:      %s\n\n' "$(omarchy font current 2>/dev/null)"
+          printf 'Hyprland config errors:\n'
+          hyprctl configerrors 2>&1 | sed 's/^/  /'
+          printf '\nOmarchy packages:\n'
+          omarchy version pkgs 2>&1 | sed 's/^/  /'
+        } | gum pager || true
+      else
+        omarchy debug --no-sudo --print 2>&1 | gum pager || true
+      fi
       ;;
     back | *) return 0 ;;
     esac

@@ -1,8 +1,9 @@
 #!/bin/bash
 # Audio: default devices and volume.
 #
-# Omarchy ships a full mixer TUI (wiremix) via `omarchy launch audio`; this
-# section covers the things you would otherwise drop to a shell for.
+# Omarchy 3 ships a mixer TUI reached with `omarchy launch audio`; Omarchy 4
+# replaced it with a shell panel. Either way this section covers the things you
+# would otherwise drop to a shell for.
 
 _audio_sinks() { pactl -f json list sinks 2>/dev/null | jq -r '.[] | "\(.name)\t\(.description)"'; }
 _audio_sources() {
@@ -97,7 +98,7 @@ audio_menu() {
       $'mute\tMute / unmute output\t' \
       $'micmute\tMute / unmute microphone\t' \
       $'mixer\tOpen the audio mixer\t' \
-      $'restart\tRestart PipeWire\t' \
+      $'restart\tRestart audio (PipeWire)\t' \
       "$OMA_BACK") || return 0
 
     case "$choice" in
@@ -129,13 +130,16 @@ audio_menu() {
       sleep 0.4
       ;;
     mixer)
-      omarchy launch audio >/dev/null 2>&1 &
+      # shellcheck disable=SC2046  # the mapped command is split on purpose
+      $(oma_cmd_line mixer) >/dev/null 2>&1 &
       oma_ok "opened the audio mixer"
       sleep 0.6
       ;;
     restart)
-      oma_confirm "Restart PipeWire? Audio will cut out briefly." &&
-        oma_exec "PipeWire restarted" omarchy restart pipewire
+      oma_confirm "Restart audio? Sound will cut out briefly." && {
+        # shellcheck disable=SC2046
+        oma_exec "Audio restarted" $(oma_cmd_line audio-restart)
+      }
       ;;
     back | *) return 0 ;;
     esac

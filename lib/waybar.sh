@@ -1,5 +1,8 @@
 #!/bin/bash
-# Waybar: which modules appear in the bar, and how the bar itself sits.
+# Waybar on Omarchy 3: which modules appear in the bar, and how the bar sits.
+#
+# Omarchy 4 replaced Waybar with the Quickshell-based Omarchy shell; bar.sh
+# handles that generation and picks between the two.
 #
 # config.jsonc may carry comments, which jq cannot round-trip. Reads tolerate
 # them; writes patch the single key in place with awk so the rest of the file —

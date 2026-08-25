@@ -3,7 +3,7 @@
 
 set -uo pipefail
 
-OMA_VERSION="1.1.0"
+OMA_VERSION="2.0.0"
 
 # Resolve through symlinks so ~/.local/bin/omasettings can point at a checkout
 # and keep working when the checkout moves.
@@ -22,6 +22,12 @@ export OMA_SELF
 # anyone who links the wrapper somewhere else.
 [[ -d $OMA_LIB ]] || OMA_LIB="/usr/share/omasettings/lib"
 
+# compat.sh first: it resolves which Omarchy generation is installed and the
+# config paths that differ between them, which everything below reads.
+# shellcheck source=../lib/compat.sh
+source "$OMA_LIB/compat.sh"
+oma_compat_init
+
 # shellcheck source=../lib/core.sh
 source "$OMA_LIB/core.sh"
 
@@ -36,11 +42,16 @@ fi
 
 # shellcheck source=../lib/hyprconf.sh
 source "$OMA_LIB/hyprconf.sh"
+# shellcheck source=../lib/hyprlua.sh
+source "$OMA_LIB/hyprlua.sh"
 # registry.sh references the config paths hyprconf.sh defines, so it follows it.
 # shellcheck source=../lib/registry.sh
 source "$OMA_LIB/registry.sh"
-for _m in appearance looknfeel waybar keybindings input monitors display audio \
-  network notifications toggles defaults apps power security system search; do
+# shelljson.sh backs the Omarchy 4 bar, idle, and notification settings, so it
+# loads before the modules that use it.
+for _m in shelljson appearance looknfeel waybar bar keybindings keybindings4 \
+  input monitors display audio network notifications toggles defaults apps \
+  power security system search; do
   # shellcheck source=/dev/null
   source "$OMA_LIB/$_m.sh"
 done
@@ -58,15 +69,15 @@ Usage:
 Sections:
   appearance     Theme, font, wallpaper, rounding, opacity, blur
   looknfeel      Gaps, borders, tiling layout, animations
-  waybar         Status bar modules, position, height
+  bar            Status bar widgets, position, visibility
   keybindings    Browse, search, rebind keyboard shortcuts
   input          Keyboard, mouse, touchpad
   display        Monitors, brightness, night light, lock screen
   monitors       Jump straight to monitor configuration
   audio          Output/input devices, volume
   network        Wi-Fi, Bluetooth, DNS
-  notifications  Do-not-disturb, timeout, position
-  toggles        Waybar, idle lock, night light, screensaver, touch input
+  notifications  Do-not-disturb, notification history
+  toggles        Bar, idle lock, night light, screensaver, touch input
   apps           Default apps, startup programs, web apps, launchers
   power          Power profile, idle behaviour, battery, hibernation
   security       Sudo, fingerprint, FIDO2, snapshots
@@ -86,14 +97,14 @@ main_menu() {
       "$(printf 'search\tSearch all settings…\ttype to find anything')" \
       "$(printf 'appearance\tAppearance\ttheme · font · wallpaper')" \
       "$(printf 'looknfeel\tLook & Feel\tgaps · borders · animations')" \
-      "$(printf 'waybar\tWaybar\tmodules · position · height')" \
+      "$(printf 'bar\t%s\twidgets · position · visibility' "$(oma_bar_label)")" \
       "$(printf 'keybindings\tKeybindings\tbrowse · search · rebind')" \
       "$(printf 'input\tInput\tkeyboard · mouse · touchpad')" \
       "$(printf 'display\tDisplay\tmonitors · brightness · night light')" \
       "$(printf 'audio\tAudio\tdevices · volume')" \
       "$(printf 'network\tNetwork\twi-fi · bluetooth · dns')" \
-      "$(printf 'notifications\tNotifications\tdo-not-disturb · timeout · position')" \
-      "$(printf 'toggles\tToggles\twaybar · idle · screensaver')" \
+      "$(printf 'notifications\tNotifications\tdo-not-disturb · history')" \
+      "$(printf 'toggles\tToggles\tbar · idle · screensaver')" \
       "$(printf 'apps\tApps & Startup\tdefaults · login programs · web apps')" \
       "$(printf 'power\tPower\tprofile · idle · battery')" \
       "$(printf 'system\tSystem\tupdate · security · snapshots')" \
@@ -107,7 +118,7 @@ main_menu() {
     restore) oma_restore ;;
     appearance) appearance_menu ;;
     looknfeel) looknfeel_menu ;;
-    waybar) waybar_menu ;;
+    bar) bar_menu ;;
     keybindings) keybindings_menu ;;
     input) input_menu ;;
     display) display_menu ;;
@@ -148,7 +159,7 @@ main() {
   "") main_menu ;;
   appearance | theme | font) appearance_menu ;;
   looknfeel | look) looknfeel_menu ;;
-  waybar | bar) waybar_menu ;;
+  bar | waybar) bar_menu ;;
   keybindings | keys | bindings) keybindings_menu ;;
   input | keyboard | touchpad) input_menu ;;
   display) display_menu ;;

@@ -1,9 +1,8 @@
 #!/bin/bash
 # Shared theming, prompts, and output helpers for omasettings.
 
-OMA_THEME_DIR="$HOME/.config/omarchy/current/theme"
-OMA_HYPR_DIR="$HOME/.config/hypr"
-OMA_STATE_DIR="$HOME/.local/state/omarchy"
+# OMA_THEME_DIR, OMA_HYPR_DIR, OMA_STATE_DIR and the rest of the version-
+# dependent paths are resolved by compat.sh, which runs before this file.
 OMA_BACK=$'back\t← Back\t'
 OMA_QUIT=$'quit\tQuit\t'
 

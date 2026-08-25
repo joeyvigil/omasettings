@@ -2,13 +2,15 @@
 # Apps & Startup: default applications, login startup programs, web apps, and
 # terminal-app launchers.
 
-OMA_AUTOSTART="$OMA_HYPR_DIR/autostart.conf"
+# OMA_AUTOSTART is resolved by compat.sh: autostart.conf on Omarchy 3,
+# autostart.lua on 4, where startup programs are declared with
+# o.exec_on_start("cmd") / o.launch_on_start("cmd") instead of exec-once.
 
 # --- startup programs --------------------------------------------------------
 
 # Lines are shown whether enabled or commented out, so disabling something is
 # reversible from the same list rather than being a delete.
-_startup_entries() {
+_startup_conf_entries() {
   [[ -f $OMA_AUTOSTART ]] || return 0
   awk '
     {
@@ -25,20 +27,52 @@ _startup_entries() {
   ' "$OMA_AUTOSTART"
 }
 
+# Omarchy 4: one call per line, either helper, with the command as a plain
+# string literal. Calls that build their argument from an expression (Omarchy's
+# own autostart.lua has a few) are deliberately skipped — this menu toggles
+# lines by commenting them out, and half-understanding an expression is worse
+# than leaving it to "edit directly".
+_startup_lua_entries() {
+  [[ -f $OMA_AUTOSTART ]] || return 0
+  awk '
+    {
+      t = $0
+      sub(/^[[:space:]]*/, "", t)
+      enabled = 1
+      if (t ~ /^--/) { enabled = 0; sub(/^--+[[:space:]]*/, "", t) }
+      sub(/[[:space:]]+$/, "", t)
+      if (t ~ /^o\.(exec|launch)_on_start\("[^"]*"\)$/) {
+        cmd = t
+        sub(/^o\.(exec|launch)_on_start\("/, "", cmd)
+        sub(/"\)$/, "", cmd)
+        printf "%s\t%s\t%s\n", NR, (enabled ? "on" : "off"), cmd
+      }
+    }
+  ' "$OMA_AUTOSTART"
+}
+
+_startup_entries() {
+  if oma_v4; then _startup_lua_entries; else _startup_conf_entries; fi
+}
+
+# Comment a line out, or bring it back. The comment marker differs between the
+# two config languages; everything else about the toggle is the same.
 _startup_toggle() {
   local lineno="$1"
   local tmp
   tmp=$(mktemp) || return 1
-  awk -v n="$lineno" '
+  local mark="#"
+  oma_v4 && mark="--"
+  awk -v n="$lineno" -v mark="$mark" '
     NR == n {
       t = $0
       sub(/^[[:space:]]*/, "", t)
       indent = $0; sub(/[^[:space:]].*$/, "", indent)
-      if (t ~ /^#/) {
-        sub(/^#+[[:space:]]*/, "", t)
+      if (substr(t, 1, length(mark)) == mark) {
+        sub("^" mark "+[[:space:]]*", "", t)
         print indent t
       } else {
-        print indent "# " t
+        print indent mark " " t
       }
       next
     }
@@ -62,12 +96,12 @@ _startup_menu() {
     done < <(_startup_entries)
 
     if ((${#entries[@]} == 0)); then
-      oma_dim "No startup programs defined in autostart.conf."
+      oma_dim "No startup programs defined in $(basename "$OMA_AUTOSTART")."
       printf '\n'
     fi
 
     entries+=($'add\tAdd a startup program\t')
-    entries+=($'edit\tEdit autostart.conf directly\t')
+    entries+=("$(printf 'edit\tEdit %s directly\t' "$(basename "$OMA_AUTOSTART")")")
     entries+=("$OMA_BACK")
 
     local choice
@@ -83,11 +117,25 @@ _startup_menu() {
     add)
       local cmd
       cmd=$(gum input --header "Command to run at login" \
-        --placeholder "uwsm-app -- signal-desktop") || continue
+        --placeholder "signal-desktop") || continue
       [[ -z $cmd ]] && continue
+
+      # Graphical apps want the uwsm-app wrapper so they land in the right
+      # systemd scope; plain services do not.
+      local wrap="no"
+      oma_confirm "Start it as a desktop app (recommended for GUI programs)?" && wrap="yes"
+
       oma_backup "$OMA_AUTOSTART"
-      printf '\n# Added by omasettings on %s\nexec-once = %s\n' \
-        "$(date '+%Y-%m-%d %H:%M')" "$cmd" >>"$OMA_AUTOSTART"
+      if oma_v4; then
+        local fn="o.exec_on_start"
+        [[ $wrap == yes ]] && fn="o.launch_on_start"
+        printf '\n-- Added by omasettings on %s\n%s("%s")\n' \
+          "$(date '+%Y-%m-%d %H:%M')" "$fn" "${cmd//\"/\\\"}" >>"$OMA_AUTOSTART"
+      else
+        [[ $wrap == yes ]] && cmd="uwsm-app -- $cmd"
+        printf '\n# Added by omasettings on %s\nexec-once = %s\n' \
+          "$(date '+%Y-%m-%d %H:%M')" "$cmd" >>"$OMA_AUTOSTART"
+      fi
       oma_ok "added — takes effect at next login"
       sleep 0.5
       ;;

@@ -9,15 +9,23 @@ _theme_slug() {
   printf '%s' "$1" | sed -E 's/<[^>]+>//g' | tr '[:upper:]' '[:lower:]' | tr ' ' '-'
 }
 
+# User themes shadow stock ones of the same slug, so ~/.config wins the lookup.
+# $OMARCHY_PATH is where Omarchy 4 keeps the stock themes; Omarchy 3 kept them
+# under ~/.local/share, which Omarchy 4 leaves as a symlink to the same place.
+_theme_bases() {
+  printf '%s\n' "$HOME/.config/omarchy/themes" \
+    "$OMARCHY_PATH/themes" "$HOME/.local/share/omarchy/themes"
+}
+
 _theme_dir() {
   local slug base
   slug=$(_theme_slug "$1")
-  for base in "$HOME/.config/omarchy/themes" "$HOME/.local/share/omarchy/themes"; do
+  while IFS= read -r base; do
     [[ -d "$base/$slug" ]] && {
       printf '%s' "$base/$slug"
       return 0
     }
-  done
+  done < <(_theme_bases)
   return 1
 }
 
@@ -26,13 +34,13 @@ _theme_dir() {
 _theme_file() {
   local slug base f
   slug=$(_theme_slug "$1")
-  for base in "$HOME/.config/omarchy/themes" "$HOME/.local/share/omarchy/themes"; do
+  while IFS= read -r base; do
     f="$base/$slug/$2"
     [[ -f $f ]] && {
       printf '%s' "$f"
       return 0
     }
-  done
+  done < <(_theme_bases)
   return 1
 }
 
@@ -166,7 +174,7 @@ _appearance_background() {
   while true; do
     oma_screen "Appearance › Wallpaper"
     local link current
-    link=$(readlink -f "$HOME/.config/omarchy/current/background" 2>/dev/null)
+    link=$(readlink -f "$OMA_BACKGROUND" 2>/dev/null)
     current=$(basename "${link:-none}")
 
     local choice
@@ -183,7 +191,7 @@ _appearance_background() {
       sleep 0.4
       ;;
     pick)
-      local dir="$HOME/.config/omarchy/current/theme/backgrounds"
+      local dir="$OMA_THEME_DIR/backgrounds"
       [[ -d $dir ]] || {
         oma_err "no backgrounds directory for this theme"
         oma_pause
@@ -206,7 +214,7 @@ _appearance_background() {
 }
 
 _appearance_bg_name() {
-  basename "$(readlink -f "$HOME/.config/omarchy/current/background" 2>/dev/null)" 2>/dev/null
+  basename "$(readlink -f "$OMA_BACKGROUND" 2>/dev/null)" 2>/dev/null
 }
 
 appearance_menu() {

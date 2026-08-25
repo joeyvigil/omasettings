@@ -96,7 +96,7 @@ display_menu() {
       "$(printf 'monitors\tMonitors…\t%s' "$count")" \
       $'brightness\tBrightness…\t' \
       $'night\tNight light…\t' \
-      $'lock\tEdit lock screen (hyprlock)\t' \
+      $'lock\tLock screen…\t' \
       "$OMA_BACK") || return 0
 
     case "$choice" in
@@ -104,8 +104,14 @@ display_menu() {
     brightness) _display_brightness ;;
     night) _display_nightlight ;;
     lock)
-      oma_edit_file "$OMA_HYPR_DIR/hyprlock.conf"
-      sleep 0.2
+      # Omarchy 3 locks with hyprlock and its own config file; Omarchy 4 locks
+      # from inside the shell, where the timeout is the only setting.
+      if oma_v4; then
+        _power_idle
+      else
+        oma_edit_file "$OMA_HYPR_DIR/hyprlock.conf"
+        sleep 0.2
+      fi
       ;;
     back | *) return 0 ;;
     esac

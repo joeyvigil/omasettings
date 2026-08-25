@@ -6,8 +6,9 @@ _input_touchpad_menu() {
   while true; do
     oma_screen "Input › Touchpad"
 
-    local hw_state="unknown"
-    [[ -f "$OMA_STATE_DIR/toggles/hypr/touchpad-disabled.conf" ]] && hw_state="disabled" || hw_state="enabled"
+    local hw_state
+    [[ -f "$OMA_STATE_DIR/toggles/hypr/touchpad-disabled.$OMA_TOGGLE_EXT" ]] &&
+      hw_state="disabled" || hw_state="enabled"
 
     local -a entries=()
     entries+=("$(printf 'enabled\tTouchpad device\t%s' "$hw_state")")
@@ -38,7 +39,7 @@ input_menu() {
     mapfile -t entries < <(oma_reg_entries input)
     entries+=($'touchpad\tTouchpad…\t')
     entries+=($'touchscreen\tTouchscreen\t')
-    entries+=($'edit\tEdit input.conf directly\t')
+    entries+=("$(printf 'edit\tEdit %s directly\t' "$(basename "$IN")")")
     entries+=("$OMA_BACK")
 
     local choice

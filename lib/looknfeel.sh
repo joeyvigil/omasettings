@@ -4,7 +4,7 @@
 # Omarchy's no-gaps mode pins gaps, borders, and rounding to 0 from a file
 # sourced after ~/.config/hypr, so it overrides everything below it.
 _lnf_gaps_mode() {
-  [[ -f "$OMA_STATE_DIR/toggles/hypr/window-no-gaps.conf" ]] &&
+  [[ -f "$OMA_STATE_DIR/toggles/hypr/window-no-gaps.$OMA_TOGGLE_EXT" ]] &&
     printf 'no gaps (overrides the settings below)' || printf 'default'
 }
 
@@ -16,7 +16,7 @@ looknfeel_menu() {
     local -a entries=()
     entries+=("$(printf 'nogaps\tWindow gaps mode\t%s' "$(_lnf_gaps_mode)")")
     mapfile -t -O "${#entries[@]}" entries < <(oma_reg_entries looknfeel)
-    entries+=($'edit\tEdit looknfeel.conf directly\t')
+    entries+=("$(printf 'edit\tEdit %s directly\t' "$(basename "$LNF")")")
     entries+=($'reset\tReset Hyprland config to defaults\t')
     entries+=("$OMA_BACK")
 

@@ -1,5 +1,11 @@
 #!/bin/bash
-# Notifications (mako).
+# Notifications.
+#
+# Omarchy 3 runs mako, configured by a file this module edits. Omarchy 4 folded
+# the notification daemon into the Quickshell shell, where popup sizing and
+# timing are internal and the only user-facing controls are do-not-disturb and
+# the history, both reached over the shell's IPC. notifications_menu picks the
+# right one; the mako helpers below are the Omarchy 3 path.
 #
 # mako's config is flat `key=value` at the top, followed by `[criteria]` blocks
 # that override settings for particular apps or modes. Only the top region is
@@ -105,7 +111,7 @@ _mako_edit() {
   _mako_apply
 }
 
-notifications_menu() {
+_notifications_mako_menu() {
   while true; do
     oma_screen "Notifications"
 
@@ -167,4 +173,69 @@ notifications_menu() {
     back | *) return 0 ;;
     esac
   done
+}
+
+# --- Omarchy 4: the shell's notification service ------------------------------
+
+_notif_dnd_state() {
+  local v
+  v=$(shell_ipc notifications dndState)
+  case "$v" in
+  on | off) printf '%s' "$v" ;;
+  # Falling back to the persisted preference keeps the menu honest when the
+  # shell is not running to answer.
+  *) [[ $(jq -r '.dnd // false' "$OMA_STATE_DIR/notifications.json" 2>/dev/null) == true ]] &&
+    printf 'on (shell stopped)' || printf 'off (shell stopped)' ;;
+  esac
+}
+
+_notifications_shell_menu() {
+  while true; do
+    oma_screen "Notifications"
+
+    local choice
+    choice=$(oma_select "Do-not-disturb and notification history" \
+      "$(printf 'dnd\tDo not disturb\t%s' "$(_notif_dnd_state)")" \
+      $'history\tReplay recent notifications\t' \
+      $'dismiss\tDismiss everything on screen\t' \
+      $'clear\tForget the notification history\t' \
+      $'restart\tRestart the Omarchy shell\t' \
+      "$OMA_BACK") || return 0
+
+    case "$choice" in
+    dnd)
+      printf '\n'
+      oma_spin "Do not disturb toggled" omarchy toggle notification silencing
+      sleep 0.6
+      ;;
+    history)
+      printf '\n'
+      oma_spin "Replayed the notification history" \
+        omarchy shell notifications showHistory
+      sleep 0.6
+      ;;
+    dismiss)
+      printf '\n'
+      oma_spin "Dismissed the notifications on screen" \
+        omarchy shell notifications dismissAll
+      sleep 0.5
+      ;;
+    clear)
+      oma_confirm "Forget every recorded notification?" || continue
+      printf '\n'
+      oma_spin "Notification history cleared" omarchy shell notifications clear
+      sleep 0.5
+      ;;
+    restart)
+      printf '\n'
+      shell_restart
+      sleep 0.4
+      ;;
+    back | *) return 0 ;;
+    esac
+  done
+}
+
+notifications_menu() {
+  if oma_v4; then _notifications_shell_menu; else _notifications_mako_menu; fi
 }

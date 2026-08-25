@@ -1,10 +1,14 @@
 #!/bin/bash
 # Monitor configuration.
 #
-# monitors.conf is a flat list of `monitor = ...` lines rather than Hyprland's
-# brace-scoped format, so it needs its own writer. Omarchy ships a wildcard
-# line (`monitor=,preferred,auto,1`) that applies to everything; a named line
-# added afterwards overrides it for that output only.
+# Neither generation stores monitors in the format the rest of the config uses,
+# so this file carries its own reader and writer for each:
+#
+#   Omarchy 3  monitor = DP-2, 2560x1440@144, 0x0, 1
+#   Omarchy 4  hl.monitor({ output = "DP-2", mode = "2560x1440@144", ... })
+#
+# Both ship a wildcard entry that applies to every output; a named entry added
+# afterwards overrides it for that output only.
 
 # Hyprland transform values.
 _mon_transform_name() {
@@ -30,8 +34,10 @@ _mon_state() {
     | "\(.width)x\(.height)@\(.refreshRate | .*100 | round / 100)|\(.x)x\(.y)|\(.scale)|\(.transform)|\(.disabled)"' 2>/dev/null
 }
 
+# --- Omarchy 3: monitor = NAME, MODE, POSITION, SCALE -------------------------
+
 # The per-monitor override line already in monitors.conf, if any.
-_mon_configured() {
+_mon_conf_configured() {
   [[ -f $OMA_MONITORS ]] || return 0
   awk -v name="$1" '
     { t = $0; sub(/^[[:space:]]*/, "", t) }
@@ -46,7 +52,7 @@ _mon_configured() {
   ' "$OMA_MONITORS" | tail -1
 }
 
-_mon_write() {
+_mon_conf_write() {
   local name="$1" spec="$2"
   mkdir -p "$(dirname "$OMA_MONITORS")"
   [[ -f $OMA_MONITORS ]] || : >"$OMA_MONITORS"
@@ -78,7 +84,7 @@ _mon_write() {
   }
 }
 
-_mon_clear() {
+_mon_conf_clear() {
   local name="$1"
   [[ -f $OMA_MONITORS ]] || return 0
   local tmp
@@ -103,15 +109,108 @@ _mon_clear() {
   }
 }
 
+
+# --- Omarchy 4: hl.monitor({ ... }) -------------------------------------------
+#
+# Omarchy writes one call per line, which is the form matched here. A
+# hand-written multi-line call is left alone rather than half-rewritten.
+
+_mon_lua_line_of() {
+  [[ -f $OMA_MONITORS ]] || return 0
+  grep -nE "^[[:space:]]*hl\.monitor\(\{.*output[[:space:]]*=[[:space:]]*\"$1\"" \
+    "$OMA_MONITORS" 2>/dev/null | tail -1
+}
+
+# The configured override for a monitor, as a human-readable spec.
+_mon_lua_configured() {
+  local line
+  line=$(_mon_lua_line_of "$1") || return 0
+  [[ -z $line ]] && return 0
+  # Strip the line number and the call wrapper, leaving the field list.
+  printf '%s' "${line#*:}" |
+    sed -E 's/^[[:space:]]*hl\.monitor\(\{[[:space:]]*//; s/[[:space:]]*\}\).*$//' |
+    sed -E 's/output[[:space:]]*=[[:space:]]*"[^"]*",?[[:space:]]*//'
+}
+
+# Build the Lua call for a monitor from the fields the menu edits.
+_mon_lua_call() {
+  local name="$1" mode="$2" pos="$3" scale="$4" transform="$5"
+  if [[ $mode == disable ]]; then
+    printf 'hl.monitor({ output = "%s", disabled = true })' "$name"
+    return
+  fi
+  local out
+  out=$(printf 'hl.monitor({ output = "%s", mode = "%s", position = "%s", scale = %s' \
+    "$name" "$mode" "$pos" "$scale")
+  [[ -n $transform && $transform != 0 ]] && out+=", transform = $transform"
+  printf '%s })' "$out"
+}
+
+_mon_lua_write() {
+  local name="$1" call="$2"
+  mkdir -p "$(dirname "$OMA_MONITORS")"
+  [[ -f $OMA_MONITORS ]] || : >"$OMA_MONITORS"
+
+  local existing lineno
+  existing=$(_mon_lua_line_of "$name")
+  lineno="${existing%%:*}"
+
+  if [[ -n $lineno ]]; then
+    local tmp
+    tmp=$(mktemp) || return 1
+    awk -v n="$lineno" -v call="$call" 'NR == n { print call; next } { print }' \
+      "$OMA_MONITORS" >"$tmp" && mv "$tmp" "$OMA_MONITORS" || {
+      rm -f "$tmp"
+      return 1
+    }
+  else
+    printf '\n%s\n' "$call" >>"$OMA_MONITORS"
+  fi
+}
+
+_mon_lua_clear() {
+  local name="$1"
+  [[ -f $OMA_MONITORS ]] || return 0
+  local existing lineno
+  existing=$(_mon_lua_line_of "$name")
+  lineno="${existing%%:*}"
+  [[ -z $lineno ]] && return 0
+  local tmp
+  tmp=$(mktemp) || return 1
+  awk -v n="$lineno" 'NR != n' "$OMA_MONITORS" >"$tmp" && mv "$tmp" "$OMA_MONITORS" || {
+    rm -f "$tmp"
+    return 1
+  }
+}
+
+# --- format dispatch ----------------------------------------------------------
+
+_mon_configured() {
+  if oma_v4; then _mon_lua_configured "$1"; else _mon_conf_configured "$1"; fi
+}
+
+_mon_clear() {
+  if oma_v4; then _mon_lua_clear "$1"; else _mon_conf_clear "$1"; fi
+}
+
 # Rewrite one field of the monitor's spec, keeping the others as they are now.
 _mon_apply() {
   local name="$1" mode="$2" pos="$3" scale="$4" transform="$5"
-  local spec="$mode, $pos, $scale"
-  [[ -n $transform && $transform != 0 ]] && spec+=", transform, $transform"
 
   oma_backup "$OMA_MONITORS"
-  _mon_write "$name" "$spec" || return 1
-  oma_ok "$name → $spec"
+  local shown
+  if oma_v4; then
+    local call
+    call=$(_mon_lua_call "$name" "$mode" "$pos" "$scale" "$transform")
+    _mon_lua_write "$name" "$call" || return 1
+    shown="$call"
+  else
+    local spec="$mode, $pos, $scale"
+    [[ -n $transform && $transform != 0 ]] && spec+=", transform, $transform"
+    _mon_conf_write "$name" "$spec" || return 1
+    shown="$name → $spec"
+  fi
+  oma_ok "$shown"
   hypr_apply "$OMA_MONITORS"
   sleep 0.4
 }
@@ -130,8 +229,10 @@ _mon_configure() {
     configured=$(_mon_configured "$name")
 
     oma_dim "$(_mon_json | jq -r --arg n "$name" '.[]|select(.name==$n)|.description')"
-    [[ -n $configured ]] && oma_dim "monitors.conf: $configured" ||
-      oma_dim "monitors.conf: no override (using the wildcard line)"
+    local mon_file
+    mon_file=$(basename "$OMA_MONITORS")
+    [[ -n $configured ]] && oma_dim "$mon_file: $configured" ||
+      oma_dim "$mon_file: no override (using the wildcard entry)"
     printf '\n'
 
     local choice
@@ -200,14 +301,18 @@ _mon_configure() {
         fi
         oma_confirm "Disable $name?" || continue
         oma_backup "$OMA_MONITORS"
-        _mon_write "$name" "disable"
+        if oma_v4; then
+          _mon_lua_write "$name" "$(_mon_lua_call "$name" disable)"
+        else
+          _mon_conf_write "$name" "disable"
+        fi
         oma_ok "$name disabled"
         hypr_apply "$OMA_MONITORS"
         sleep 0.4
       fi
       ;;
     reset)
-      oma_confirm "Remove the $name override from monitors.conf?" || continue
+      oma_confirm "Remove the $name override from $(basename "$OMA_MONITORS")?" || continue
       oma_backup "$OMA_MONITORS"
       _mon_clear "$name"
       oma_ok "override removed"
@@ -243,7 +348,7 @@ monitors_menu() {
       fi
     done < <(_mon_json | jq -r '.[].name')
 
-    entries+=($'edit\tEdit monitors.conf directly\t')
+    entries+=("$(printf 'edit\tEdit %s directly\t' "$(basename "$OMA_MONITORS")")")
     entries+=("$OMA_BACK")
 
     local choice
